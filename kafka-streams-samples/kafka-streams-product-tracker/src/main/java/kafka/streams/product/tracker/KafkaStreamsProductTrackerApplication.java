@@ -16,10 +16,16 @@
 
 package kafka.streams.product.tracker;
 
+import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.Materialized;
+import org.apache.kafka.streams.kstream.Serialized;
 import org.apache.kafka.streams.kstream.TimeWindows;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -30,12 +36,6 @@ import org.springframework.cloud.stream.binder.kafka.streams.annotations.KafkaSt
 import org.springframework.kafka.support.serializer.JsonSerde;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.util.StringUtils;
-
-import java.time.Instant;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @SpringBootApplication
 public class KafkaStreamsProductTrackerApplication {
@@ -48,20 +48,24 @@ public class KafkaStreamsProductTrackerApplication {
 	@EnableConfigurationProperties(ProductTrackerProperties.class)
 	public static class ProductCountApplication {
 
-		@Autowired
-		ProductTrackerProperties productTrackerProperties;
+		private final ProductTrackerProperties productTrackerProperties;
 
-		@Autowired
-		TimeWindows timeWindows;
+		private final TimeWindows timeWindows;
 
-		@StreamListener("input")
+        public ProductCountApplication(ProductTrackerProperties productTrackerProperties, TimeWindows timeWindows) {
+            this.productTrackerProperties = productTrackerProperties;
+            this.timeWindows = timeWindows;
+        }
+
+        @StreamListener("input")
 		@SendTo("output")
 		public KStream<Integer, ProductStatus> process(KStream<Object, Product> input) {
 			return input
 					.filter((key, product) -> productIds().contains(product.getId()))
 					.map((key, value) -> new KeyValue<>(value, value))
-					.groupByKey(new JsonSerde<>(Product.class), new JsonSerde<>(Product.class))
-					.count(timeWindows, "product-counts")
+					.groupByKey(Serialized.with(new JsonSerde<>(Product.class), new JsonSerde<>(Product.class)))
+                    .windowedBy(timeWindows)
+					.count(Materialized.as("product-counts"))
 					.toStream()
 					.map((key, value) -> new KeyValue<>(key.key().id, new ProductStatus(key.key().id,
 							value, Instant.ofEpochMilli(key.window().start()).atZone(ZoneId.systemDefault()).toLocalTime(),

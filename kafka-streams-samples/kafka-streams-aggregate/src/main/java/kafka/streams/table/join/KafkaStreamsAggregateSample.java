@@ -26,13 +26,12 @@ import org.apache.kafka.streams.kstream.Serialized;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.cloud.stream.annotation.Input;
 import org.springframework.cloud.stream.annotation.StreamListener;
-import org.springframework.cloud.stream.binder.kafka.streams.QueryableStoreRegistry;
+import org.springframework.cloud.stream.binder.kafka.streams.InteractiveQueryService;
 import org.springframework.kafka.support.serializer.JsonSerde;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,14 +39,17 @@ import org.springframework.web.bind.annotation.RestController;
 @SpringBootApplication
 public class KafkaStreamsAggregateSample {
 
-	@Autowired
-	private QueryableStoreRegistry queryableStoreRegistry;
+    private final InteractiveQueryService queryService;
 
 	public static void main(String[] args) {
 		SpringApplication.run(KafkaStreamsAggregateSample.class, args);
 	}
 
-	@EnableBinding(KafkaStreamsProcessorX.class)
+    public KafkaStreamsAggregateSample(InteractiveQueryService queryService) {
+	    this.queryService = queryService;
+	}
+
+    @EnableBinding(KafkaStreamsProcessorX.class)
 	public static class KafkaStreamsAggregateSampleApplication {
 
 		@StreamListener("input")
@@ -75,7 +77,7 @@ public class KafkaStreamsAggregateSample {
 		public String events() {
 
 			final ReadOnlyKeyValueStore<String, String> topFiveStore =
-					queryableStoreRegistry.getQueryableStoreType("test-events-snapshots", QueryableStoreTypes.<String, String>keyValueStore());
+                    queryService.getQueryableStore("test-events-snapshots", QueryableStoreTypes.<String, String>keyValueStore());
 			return topFiveStore.get("12345");
 		}
 	}
