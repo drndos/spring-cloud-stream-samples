@@ -41,50 +41,50 @@ public class KafkaStreamsAggregateSample {
 
     private final InteractiveQueryService queryService;
 
-	public static void main(String[] args) {
-		SpringApplication.run(KafkaStreamsAggregateSample.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(KafkaStreamsAggregateSample.class, args);
+    }
 
     public KafkaStreamsAggregateSample(InteractiveQueryService queryService) {
-	    this.queryService = queryService;
-	}
+        this.queryService = queryService;
+    }
 
     @EnableBinding(KafkaStreamsProcessorX.class)
-	public static class KafkaStreamsAggregateSampleApplication {
+    public static class KafkaStreamsAggregateSampleApplication {
 
-		@StreamListener("input")
-		public void process(KStream<Object, DomainEvent> input) {
-			ObjectMapper mapper = new ObjectMapper();
-			Serde<DomainEvent> domainEventSerde = new JsonSerde<>( DomainEvent.class, mapper );
+        @StreamListener("input")
+        public void process(KStream<Object, DomainEvent> input) {
+            ObjectMapper mapper = new ObjectMapper();
+            Serde<DomainEvent> domainEventSerde = new JsonSerde<>(DomainEvent.class, mapper);
 
-			input
-					.groupBy(
-							(s, domainEvent) -> domainEvent.boardUuid,
-							Serialized.with(null, domainEventSerde))
-					.aggregate(
-							String::new,
-							(s, domainEvent, board) -> board.concat(domainEvent.eventType),
-							Materialized.<String, String, KeyValueStore<Bytes, byte[]>>as("test-events-snapshots").withKeySerde(Serdes.String()).
-									withValueSerde(Serdes.String())
-					);
-		}
-	}
+            input
+                    .groupBy(
+                            (s, domainEvent) -> domainEvent.boardUuid,
+                            Serialized.with(null, domainEventSerde))
+                    .aggregate(
+                            String::new,
+                            (s, domainEvent, board) -> board.concat(domainEvent.eventType),
+                            Materialized.<String, String, KeyValueStore<Bytes, byte[]>>as("test-events-snapshots").withKeySerde(Serdes.String()).
+                                    withValueSerde(Serdes.String())
+                    );
+        }
+    }
 
-	@RestController
-	public class FooController {
+    @RestController
+    public class FooController {
 
-		@RequestMapping("/events")
-		public String events() {
+        @RequestMapping("/events")
+        public String events() {
 
-			final ReadOnlyKeyValueStore<String, String> topFiveStore =
+            final ReadOnlyKeyValueStore<String, String> topFiveStore =
                     queryService.getQueryableStore("test-events-snapshots", QueryableStoreTypes.<String, String>keyValueStore());
-			return topFiveStore.get("12345");
-		}
-	}
+            return topFiveStore.get("12345");
+        }
+    }
 
-	interface KafkaStreamsProcessorX {
+    interface KafkaStreamsProcessorX {
 
-		@Input("input")
-		KStream<?, ?> input();
-	}
+        @Input("input")
+        KStream<?, ?> input();
+    }
 }
